@@ -34,3 +34,15 @@ To be the best on the market, the stress test must exercise every functional blo
 *   **DirectX 12 / DX12 Ultimate**: For Mesh Shaders, Sampler Feedback, and Variable Rate Shading (VRS).
 *   **CUDA / ROCm**: For low-level compute and AI core access.
 *   **Metal**: For Apple Silicon support.
+## 6. Unique Market-Leading Features (The "X-Factor")
+
+To truly be the best, we must solve the problems current tools ignore:
+
+*   **Anti-Cheat Protection**: Detect if the GPU driver is "cheating" by lowering image quality or throttling clocks specifically during the test.
+*   **System Health Validation**: 
+    -   Automatically flag "buggy" driver versions known to the community.
+    -   Detect PCIe Riser cable instability (a common source of crashes).
+    -   Monitor "12VHPWR" (or equivalent) power connector health via telemetry.
+*   **Dynamic Transition Testing**: Instead of just 100% load, rapidly cycle between specific power states (P-states) to find stability issues in the "boost curve" transitions.
+*   **Game-Bottleneck Simulation**: Mode that mimics the specific load profile of popular engines (e.g., Unreal Engine 5, Frostbite) rather than just a synthetic "fur donut."
+*   **Acoustic & Efficiency Score**: Use fan speeds and power draw vs. performance to give an "Acoustic Score" (how loud/hot the GPU is compared to its performance class).
