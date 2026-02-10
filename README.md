@@ -16,7 +16,7 @@ The goal is to build a SOTA stress test tool. At the beginning only a few featur
 ## How to run
 
 - `mkdir -p build && cd build && cmake .. && make -j$(nproc)`
-- `./gpu-burn-pro 60` — run a 60-second stress test
-- `./gpu-burn-pro -h` — see all options
+- `./gpu-burn-pro --full` — 5 minute stress test
+- `./gpu-burn-pro --quick` — 10 second stress test
 
 ## Todo
