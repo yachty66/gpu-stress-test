@@ -1,52 +1,25 @@
-#include "nvml_monitor.hpp"
+#include "gpu_backend.hpp"
+#include "stress_test.hpp"
 #include <iostream>
-#include <chrono>
-#include <thread>
-#include <iomanip>
-
-extern void run_stress_test(int duration_seconds);
+#include <string>
 
 int main(int argc, char* argv[]) {
-    std::cout << "========================================" << std::endl;
-    std::cout << "   ZUSE GPU STRESS TEST v1.0 (NVIDIA)   " << std::endl;
-    std::cout << "========================================" << std::endl;
-    std::cout << "[INFO] Mode: HEADLESS (Default)" << std::endl;
-    
-    NvmlMonitor monitor;
-    if (!monitor.initialize()) {
+    int duration = 60; // Default 60 seconds
+    if (argc > 1) {
+        duration = std::stoi(argv[1]);
+    }
+
+    std::cout << "Starting GPU Burn Pro (Simplified replica of gpu-burn)" << std::endl;
+    std::cout << "Target duration: " << duration << " seconds" << std::endl;
+
+    try {
+        auto backend = create_cuda_backend();
+        StressTest stress(std::move(backend));
+        stress.start(duration);
+    } catch (const std::exception& e) {
+        std::cerr << "Error: " << e.what() << std::endl;
         return 1;
     }
-    
-    std::cout << "[INFO] Target: " << monitor.getGpuName() << std::endl;
-    
-    // Start stress test in a separate thread if we want real-time telemetry
-    // For now, let's just run them sequentially for a simple v1 check
-    int test_duration = 10;
-    
-    std::cout << "[INFO] Starting 10s stress test..." << std::endl;
-    
-    std::thread telemetry_thread([&monitor, test_duration]() {
-        auto start = std::chrono::steady_clock::now();
-        auto duration = std::chrono::seconds(test_duration);
-        while (std::chrono::steady_clock::now() - start < duration) {
-            GpuStats stats = monitor.getStats();
-            std::cout << "\r" << std::setw(3) << stats.temp << "C | " 
-                      << std::setw(3) << stats.power << "W | " 
-                      << std::setw(4) << stats.clock << "MHz | " 
-                      << std::setw(2) << stats.utilization << "% | VRAM: " 
-                      << stats.vram_used << "/" << stats.vram_total << "MB " << std::flush;
-            std::this_thread::sleep_for(std::chrono::milliseconds(200));
-        }
-    });
-    
-    run_stress_test(test_duration);
-    
-    if (telemetry_thread.joinable()) {
-        telemetry_thread.join();
-    }
-    
-    std::cout << std::endl << "========================================" << std::endl;
-    std::cout << "[DONE] Stress test complete." << std::endl;
-    
+
     return 0;
 }
