@@ -69,22 +69,23 @@ inline void cublas_assert(cublasStatus_t code, const char* file, int line) {
 
 // ---------------------------------------------------------------------------
 // Comparison kernels (ported from gpu-burn compare.cu)
+// Compare result slot against slot 0 (the reference)
 // ---------------------------------------------------------------------------
-__global__ void compare_kernel_float(const float* C, const float* C_ref,
-                                     int* faultyElems, int n) {
+__global__ void compare_kernel_float(const float* C, int* faultyElems,
+                                     size_t slot_offset, int n) {
     int idx = blockIdx.x * blockDim.x + threadIdx.x;
     if (idx < n * n) {
-        if (fabsf(C[idx] - C_ref[idx]) > EPSILON) {
+        if (fabsf(C[idx] - C[slot_offset + idx]) > EPSILON) {
             atomicAdd(faultyElems, 1);
         }
     }
 }
 
-__global__ void compare_kernel_double(const double* C, const double* C_ref,
-                                      int* faultyElems, int n) {
+__global__ void compare_kernel_double(const double* C, int* faultyElems,
+                                      size_t slot_offset, int n) {
     int idx = blockIdx.x * blockDim.x + threadIdx.x;
     if (idx < n * n) {
-        if (fabs(C[idx] - C_ref[idx]) > EPSILOND) {
+        if (fabs(C[idx] - C[slot_offset + idx]) > EPSILOND) {
             atomicAdd(faultyElems, 1);
         }
     }
@@ -97,19 +98,19 @@ class CudaBackend : public GpuBackend {
 private:
     struct DeviceResources {
         cublasHandle_t handle = nullptr;
-        // Float buffers
-        float* d_A_f = nullptr;
-        float* d_B_f = nullptr;
-        float* d_C_f = nullptr;
-        float* d_C_ref_f = nullptr;
-        // Double buffers
-        double* d_A_d = nullptr;
-        double* d_B_d = nullptr;
-        double* d_C_d = nullptr;
-        double* d_C_ref_d = nullptr;
+        // Input matrices (one copy each)
+        void* d_A = nullptr;
+        void* d_B = nullptr;
+        // Result buffer: holds num_slots matrices contiguously
+        // Slot 0 = reference, slots 1..num_slots-1 = results to compare
+        void* d_C = nullptr;
         // Error tracking (allocated once)
         int* d_errors = nullptr;
         int matrix_size = SIZE;
+        size_t num_slots = 0;       // Number of result matrix slots
+        size_t matrix_elements = 0; // n * n
+        size_t matrix_bytes = 0;    // n * n * sizeof(T)
+        size_t total_allocated = 0; // Total bytes allocated on GPU
         Precision precision = Precision::FLOAT;
         bool initialized = false;
     };
@@ -185,11 +186,16 @@ public:
         }
 
         int n = res.matrix_size;
+        res.matrix_elements = (size_t)n * n;
+
+        // Determine element size based on precision
+        size_t elem_size = (config.precision == Precision::DOUBLE) ? sizeof(double) : sizeof(float);
+        res.matrix_bytes = res.matrix_elements * elem_size;
 
         // Determine how much memory to use
         size_t free_mem, total_mem;
         CUDA_CHECK(cudaMemGetInfo(&free_mem, &total_mem));
-        
+
         size_t use_bytes;
         if (config.memory_bytes > 0) {
             use_bytes = static_cast<size_t>(config.memory_bytes);
@@ -197,67 +203,56 @@ public:
             use_bytes = static_cast<size_t>(free_mem * config.memory_fraction);
         }
 
+        // Calculate number of result slots that fit in memory
+        // Memory layout: A (1 matrix) + B (1 matrix) + C (num_slots matrices)
+        // So: num_slots = (use_bytes - 2 * matrix_bytes) / matrix_bytes
+        if (use_bytes < 3 * res.matrix_bytes) {
+            throw std::runtime_error("Not enough GPU memory for stress test");
+        }
+        res.num_slots = (use_bytes - 2 * res.matrix_bytes) / res.matrix_bytes;
+        if (res.num_slots < 2) {
+            throw std::runtime_error("Not enough GPU memory for at least 2 result slots");
+        }
+
+        // Generate random matrices on host (like gpu-burn)
+        srand(10);
         if (config.precision == Precision::DOUBLE) {
-            size_t elem_size = sizeof(double);
-            size_t matrix_bytes = n * n * elem_size;
-
-            if (use_bytes < 3 * matrix_bytes) {
-                throw std::runtime_error("Not enough GPU memory for stress test");
-            }
-
-            // Generate random matrices on host (like gpu-burn)
-            std::vector<double> h_A(n * n), h_B(n * n);
-            srand(10);
-            for (int i = 0; i < n * n; ++i) {
+            std::vector<double> h_A(res.matrix_elements), h_B(res.matrix_elements);
+            for (size_t i = 0; i < res.matrix_elements; ++i) {
                 h_A[i] = (double)(rand() % 1000000) / 100000.0;
                 h_B[i] = (double)(rand() % 1000000) / 100000.0;
             }
-
-            CUDA_CHECK(cudaMalloc(&res.d_A_d, matrix_bytes));
-            CUDA_CHECK(cudaMalloc(&res.d_B_d, matrix_bytes));
-            CUDA_CHECK(cudaMalloc(&res.d_C_d, matrix_bytes));
-            CUDA_CHECK(cudaMalloc(&res.d_C_ref_d, matrix_bytes));
-
-            CUDA_CHECK(cudaMemcpy(res.d_A_d, h_A.data(), matrix_bytes, cudaMemcpyHostToDevice));
-            CUDA_CHECK(cudaMemcpy(res.d_B_d, h_B.data(), matrix_bytes, cudaMemcpyHostToDevice));
-
-            std::cout << "  GPU " << device_id << ": " << (use_bytes / 1024 / 1024) << " MB allocated"
-                      << " (" << (free_mem / 1024 / 1024) << " MB free), using DOUBLES"
-                      << (config.use_tensor_cores ? ", Tensor Cores" : "") << std::endl;
+            CUDA_CHECK(cudaMalloc(&res.d_A, res.matrix_bytes));
+            CUDA_CHECK(cudaMalloc(&res.d_B, res.matrix_bytes));
+            CUDA_CHECK(cudaMemcpy(res.d_A, h_A.data(), res.matrix_bytes, cudaMemcpyHostToDevice));
+            CUDA_CHECK(cudaMemcpy(res.d_B, h_B.data(), res.matrix_bytes, cudaMemcpyHostToDevice));
         } else {
-            size_t elem_size = sizeof(float);
-            size_t matrix_bytes = n * n * elem_size;
-
-            if (use_bytes < 3 * matrix_bytes) {
-                throw std::runtime_error("Not enough GPU memory for stress test");
-            }
-
-            // Generate random matrices on host (like gpu-burn)
-            std::vector<float> h_A(n * n), h_B(n * n);
-            srand(10);
-            for (int i = 0; i < n * n; ++i) {
+            std::vector<float> h_A(res.matrix_elements), h_B(res.matrix_elements);
+            for (size_t i = 0; i < res.matrix_elements; ++i) {
                 h_A[i] = (float)((double)(rand() % 1000000) / 100000.0);
                 h_B[i] = (float)((double)(rand() % 1000000) / 100000.0);
             }
-
-            CUDA_CHECK(cudaMalloc(&res.d_A_f, matrix_bytes));
-            CUDA_CHECK(cudaMalloc(&res.d_B_f, matrix_bytes));
-            CUDA_CHECK(cudaMalloc(&res.d_C_f, matrix_bytes));
-            CUDA_CHECK(cudaMalloc(&res.d_C_ref_f, matrix_bytes));
-
-            CUDA_CHECK(cudaMemcpy(res.d_A_f, h_A.data(), matrix_bytes, cudaMemcpyHostToDevice));
-            CUDA_CHECK(cudaMemcpy(res.d_B_f, h_B.data(), matrix_bytes, cudaMemcpyHostToDevice));
-
-            std::cout << "  GPU " << device_id << ": " << (use_bytes / 1024 / 1024) << " MB allocated"
-                      << " (" << (free_mem / 1024 / 1024) << " MB free), using FLOATS"
-                      << (config.use_tensor_cores ? ", Tensor Cores" : "") << std::endl;
+            CUDA_CHECK(cudaMalloc(&res.d_A, res.matrix_bytes));
+            CUDA_CHECK(cudaMalloc(&res.d_B, res.matrix_bytes));
+            CUDA_CHECK(cudaMemcpy(res.d_A, h_A.data(), res.matrix_bytes, cudaMemcpyHostToDevice));
+            CUDA_CHECK(cudaMemcpy(res.d_B, h_B.data(), res.matrix_bytes, cudaMemcpyHostToDevice));
         }
 
-        // Allocate error counter once
+        // Allocate the big result buffer: num_slots contiguous matrices
+        size_t c_total_bytes = res.num_slots * res.matrix_bytes;
+        CUDA_CHECK(cudaMalloc(&res.d_C, c_total_bytes));
+
+        res.total_allocated = 2 * res.matrix_bytes + c_total_bytes;
+
+        // Allocate error counter
         CUDA_CHECK(cudaMalloc(&res.d_errors, sizeof(int)));
 
-        // Compute reference result
-        compute_reference(device_id);
+        std::cout << "  GPU " << device_id << ": "
+                  << (res.total_allocated / 1024 / 1024) << " MB allocated"
+                  << " (" << (free_mem / 1024 / 1024) << " MB free)"
+                  << ", " << res.num_slots << " result slots"
+                  << ", using " << (config.precision == Precision::DOUBLE ? "DOUBLES" : "FLOATS")
+                  << (config.use_tensor_cores ? ", Tensor Cores" : "") << std::endl;
 
         res.initialized = true;
         return true;
@@ -270,48 +265,64 @@ public:
 
         auto start = std::chrono::steady_clock::now();
 
-        int host_errors = 0;
-
-        // Reset error counter
-        CUDA_CHECK(cudaMemset(res.d_errors, 0, sizeof(int)));
-
+        // Compute A*B into every result slot
         if (res.precision == Precision::DOUBLE) {
             double alpha = 1.0, beta = 0.0;
-            CUBLAS_CHECK(cublasDgemm(res.handle, CUBLAS_OP_N, CUBLAS_OP_N,
-                                     n, n, n, &alpha,
-                                     res.d_A_d, n, res.d_B_d, n,
-                                     &beta, res.d_C_d, n));
-            
-            // Synchronize before comparing
-            CUDA_CHECK(cudaDeviceSynchronize());
-
-            int threads = 256;
-            int blocks = (n * n + threads - 1) / threads;
-            compare_kernel_double<<<blocks, threads>>>(res.d_C_d, res.d_C_ref_d, res.d_errors, n);
+            double* C_base = static_cast<double*>(res.d_C);
+            for (size_t s = 0; s < res.num_slots; ++s) {
+                CUBLAS_CHECK(cublasDgemm(res.handle, CUBLAS_OP_N, CUBLAS_OP_N,
+                                         n, n, n, &alpha,
+                                         static_cast<double*>(res.d_A), n,
+                                         static_cast<double*>(res.d_B), n,
+                                         &beta,
+                                         C_base + s * res.matrix_elements, n));
+            }
         } else {
             float alpha = 1.0f, beta = 0.0f;
-            CUBLAS_CHECK(cublasSgemm(res.handle, CUBLAS_OP_N, CUBLAS_OP_N,
-                                     n, n, n, &alpha,
-                                     res.d_A_f, n, res.d_B_f, n,
-                                     &beta, res.d_C_f, n));
-            
-            // Synchronize before comparing
-            CUDA_CHECK(cudaDeviceSynchronize());
+            float* C_base = static_cast<float*>(res.d_C);
+            for (size_t s = 0; s < res.num_slots; ++s) {
+                CUBLAS_CHECK(cublasSgemm(res.handle, CUBLAS_OP_N, CUBLAS_OP_N,
+                                         n, n, n, &alpha,
+                                         static_cast<float*>(res.d_A), n,
+                                         static_cast<float*>(res.d_B), n,
+                                         &beta,
+                                         C_base + s * res.matrix_elements, n));
+            }
+        }
 
-            int threads = 256;
-            int blocks = (n * n + threads - 1) / threads;
-            compare_kernel_float<<<blocks, threads>>>(res.d_C_f, res.d_C_ref_f, res.d_errors, n);
+        // Synchronize before comparing
+        CUDA_CHECK(cudaDeviceSynchronize());
+
+        // Compare all slots against slot 0 (the reference)
+        CUDA_CHECK(cudaMemset(res.d_errors, 0, sizeof(int)));
+
+        int threads = 256;
+        int blocks = (n * n + threads - 1) / threads;
+
+        if (res.precision == Precision::DOUBLE) {
+            double* C_base = static_cast<double*>(res.d_C);
+            for (size_t s = 1; s < res.num_slots; ++s) {
+                compare_kernel_double<<<blocks, threads>>>(
+                    C_base, res.d_errors, s * res.matrix_elements, n);
+            }
+        } else {
+            float* C_base = static_cast<float*>(res.d_C);
+            for (size_t s = 1; s < res.num_slots; ++s) {
+                compare_kernel_float<<<blocks, threads>>>(
+                    C_base, res.d_errors, s * res.matrix_elements, n);
+            }
         }
 
         // Synchronize and read error count
         CUDA_CHECK(cudaDeviceSynchronize());
+        int host_errors = 0;
         CUDA_CHECK(cudaMemcpy(&host_errors, res.d_errors, sizeof(int), cudaMemcpyDeviceToHost));
 
         auto end = std::chrono::steady_clock::now();
         double elapsed = std::chrono::duration<double>(end - start).count();
 
-        // 1 SGEMM of NxN = 2*N^3 FLOPS
-        long long ops = 2LL * n * n * n;
+        // Total FLOPS: num_slots SGEMMs, each is 2*N^3
+        long long ops = (long long)res.num_slots * 2LL * n * n * n;
 
         return {host_errors, ops, elapsed};
     }
@@ -332,38 +343,12 @@ public:
     void cleanup(int device_id) override {
         CUDA_CHECK(cudaSetDevice(device_id));
         auto& res = resources[device_id];
-        if (res.d_A_f) { cudaFree(res.d_A_f); res.d_A_f = nullptr; }
-        if (res.d_B_f) { cudaFree(res.d_B_f); res.d_B_f = nullptr; }
-        if (res.d_C_f) { cudaFree(res.d_C_f); res.d_C_f = nullptr; }
-        if (res.d_C_ref_f) { cudaFree(res.d_C_ref_f); res.d_C_ref_f = nullptr; }
-        if (res.d_A_d) { cudaFree(res.d_A_d); res.d_A_d = nullptr; }
-        if (res.d_B_d) { cudaFree(res.d_B_d); res.d_B_d = nullptr; }
-        if (res.d_C_d) { cudaFree(res.d_C_d); res.d_C_d = nullptr; }
-        if (res.d_C_ref_d) { cudaFree(res.d_C_ref_d); res.d_C_ref_d = nullptr; }
+        if (res.d_A) { cudaFree(res.d_A); res.d_A = nullptr; }
+        if (res.d_B) { cudaFree(res.d_B); res.d_B = nullptr; }
+        if (res.d_C) { cudaFree(res.d_C); res.d_C = nullptr; }
         if (res.d_errors) { cudaFree(res.d_errors); res.d_errors = nullptr; }
         if (res.handle) { cublasDestroy(res.handle); res.handle = nullptr; }
         res.initialized = false;
-    }
-
-private:
-    void compute_reference(int device_id) {
-        auto& res = resources[device_id];
-        int n = res.matrix_size;
-
-        if (res.precision == Precision::DOUBLE) {
-            double alpha = 1.0, beta = 0.0;
-            CUBLAS_CHECK(cublasDgemm(res.handle, CUBLAS_OP_N, CUBLAS_OP_N,
-                                     n, n, n, &alpha,
-                                     res.d_A_d, n, res.d_B_d, n,
-                                     &beta, res.d_C_ref_d, n));
-        } else {
-            float alpha = 1.0f, beta = 0.0f;
-            CUBLAS_CHECK(cublasSgemm(res.handle, CUBLAS_OP_N, CUBLAS_OP_N,
-                                     n, n, n, &alpha,
-                                     res.d_A_f, n, res.d_B_f, n,
-                                     &beta, res.d_C_ref_f, n));
-        }
-        CUDA_CHECK(cudaDeviceSynchronize());
     }
 };
 
