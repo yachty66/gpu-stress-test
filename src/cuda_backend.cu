@@ -1,8 +1,8 @@
 /*
  * GPU Stress Test - CUDA Backend
  *
- * Stress testing logic derived from gpu-burn by Ville Timonen
- * (https://github.com/wilicc/gpu-burn), BSD-licensed:
+ * Portions of the stress testing logic are derived from work by Ville Timonen,
+ * BSD-licensed:
  *
  * Copyright (c) 2022, Ville Timonen
  * All rights reserved.
@@ -39,10 +39,10 @@
 #include <cstdlib>
 #include <chrono>
 
-// Matrix size (same as gpu-burn)
+// Matrix size
 static const int SIZE = 2048;
 
-// Epsilon for floating point comparison (from gpu-burn)
+// Epsilon for floating point comparison
 #define EPSILON 0.001f
 #define EPSILOND 0.0000001
 
@@ -68,7 +68,7 @@ inline void cublas_assert(cublasStatus_t code, const char* file, int line) {
 }
 
 // ---------------------------------------------------------------------------
-// Comparison kernels (ported from gpu-burn compare.cu)
+// Comparison kernels
 // Compare result slot against slot 0 (the reference)
 // ---------------------------------------------------------------------------
 __global__ void compare_kernel_float(const float* C, int* faultyElems,
@@ -214,7 +214,7 @@ public:
             throw std::runtime_error("Not enough GPU memory for at least 2 result slots");
         }
 
-        // Generate random matrices on host (like gpu-burn)
+        // Generate random matrices on host
         srand(10);
         if (config.precision == Precision::DOUBLE) {
             std::vector<double> h_A(res.matrix_elements), h_B(res.matrix_elements);

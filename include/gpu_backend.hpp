@@ -1,9 +1,8 @@
 /*
  * GPU Stress Test - Backend Interface
- * 
- * Portions of the stress testing logic are derived from gpu-burn
- * (https://github.com/wilicc/gpu-burn), which is BSD-licensed:
- * Copyright (c) 2022, Ville Timonen. All rights reserved.
+ *
+ * Portions of the stress testing logic are derived from work by
+ * Ville Timonen, BSD-licensed.
  */
 
 #pragma once

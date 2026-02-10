@@ -7,14 +7,14 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 # Find CUDA
 find_package(CUDAToolkit REQUIRED)
 
-add_executable(gpu-burn-pro
+add_executable(gpu-stress-test
     src/main.cpp
     src/stress_test.cpp
     src/cuda_backend.cu
 )
 
-target_include_directories(gpu-burn-pro PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
-target_link_libraries(gpu-burn-pro PRIVATE CUDA::cublas CUDA::cudart)
+target_include_directories(gpu-stress-test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
+target_link_libraries(gpu-stress-test PRIVATE CUDA::cublas CUDA::cudart)
 
 # NVML for temperature monitoring
 find_library(NVML_LIBRARY nvidia-ml
@@ -26,16 +26,16 @@ find_library(NVML_LIBRARY nvidia-ml
         /usr/local/cuda/targets/x86_64-linux/lib/stubs
 )
 if(NVML_LIBRARY)
-    target_link_libraries(gpu-burn-pro PRIVATE ${NVML_LIBRARY})
+    target_link_libraries(gpu-stress-test PRIVATE ${NVML_LIBRARY})
     message(STATUS "Found NVML: ${NVML_LIBRARY}")
 else()
     message(WARNING "NVML not found — temperature monitoring will be disabled")
-    target_compile_definitions(gpu-burn-pro PRIVATE NO_NVML)
+    target_compile_definitions(gpu-stress-test PRIVATE NO_NVML)
 endif()
 
 # Compiler flags
 if(MSVC)
-    target_compile_options(gpu-burn-pro PRIVATE /W4)
+    target_compile_options(gpu-stress-test PRIVATE /W4)
 else()
-    target_compile_options(gpu-burn-pro PRIVATE -Wall -Wextra -O3)
+    target_compile_options(gpu-stress-test PRIVATE -Wall -Wextra -O3)
 endif()

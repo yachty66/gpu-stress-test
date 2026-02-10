@@ -1,8 +1,7 @@
 /*
  * GPU Stress Test - Main Entry Point
  *
- * A GPU health testing tool inspired by gpu-burn.
- * https://github.com/wilicc/gpu-burn
+ * A GPU health testing tool.
  */
 
 #include "gpu_backend.hpp"
@@ -12,8 +11,8 @@
 #include <cstring>
 
 void show_help() {
-    std::cout << "GPU Burn Pro - GPU Health & Stress Testing Tool\n\n"
-              << "Usage: gpu-burn-pro [MODE]\n\n"
+    std::cout << "GPU Stress Test - GPU Health & Stress Testing Tool\n\n"
+              << "Usage: gpu-stress-test [MODE]\n\n"
               << "Modes:\n"
               << "  --full    5 minute stress test\n"
               << "  --quick   10 second stress test\n"
@@ -42,7 +41,7 @@ int main(int argc, char* argv[]) {
     }
 
     std::cout << "╔══════════════════════════════════════════╗" << std::endl;
-    std::cout << "║       GPU Burn Pro - Stress Tester       ║" << std::endl;
+    std::cout << "║       GPU Stress Test                    ║" << std::endl;
     std::cout << "╚══════════════════════════════════════════╝" << std::endl;
     std::cout << "\nConfiguration:" << std::endl;
     std::cout << "  Duration:     " << config.duration_seconds << " seconds" << std::endl;
