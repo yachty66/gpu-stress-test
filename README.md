@@ -1,7 +1,5 @@
 # GPU Stress Test
 
-## Goal
-
 The goal is to build a SOTA stress test tool. At the beginning only a few features are implemented, but the goal is to make it a complete and feature-rich tool.
 
 ## How it works
