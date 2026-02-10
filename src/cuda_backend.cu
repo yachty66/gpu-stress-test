@@ -112,11 +112,11 @@ public:
     void cleanup(int device_id) override {
         cudaSetDevice(device_id);
         auto& res = resources[device_id];
-        if (res.d_A) cudaFree(res.d_A);
-        if (res.d_B) cudaFree(res.d_B);
-        if (res.d_C) cudaFree(res.d_C);
-        if (res.d_C_ref) cudaFree(res.d_C_ref);
-        if (res.handle) cublasDestroy(res.handle);
+        if (res.d_A) { cudaFree(res.d_A); res.d_A = nullptr; }
+        if (res.d_B) { cudaFree(res.d_B); res.d_B = nullptr; }
+        if (res.d_C) { cudaFree(res.d_C); res.d_C = nullptr; }
+        if (res.d_C_ref) { cudaFree(res.d_C_ref); res.d_C_ref = nullptr; }
+        if (res.handle) { cublasDestroy(res.handle); res.handle = nullptr; }
     }
 };
 

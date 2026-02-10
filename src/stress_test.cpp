@@ -50,14 +50,17 @@ void StressTest::start(int duration_seconds) {
 }
 
 void StressTest::stop() {
+    if (!running && workers.empty()) return;
     running = false;
     for (auto& t : workers) {
         if (t.joinable()) t.join();
     }
     workers.clear();
     
-    for (const auto& s : stats) {
-        backend->cleanup(s->device_id);
+    if (backend) {
+        for (const auto& s : stats) {
+            backend->cleanup(s->device_id);
+        }
     }
 }
 
