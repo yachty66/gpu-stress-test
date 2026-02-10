@@ -26,8 +26,20 @@ The goal is to build a SOTA stress test tool. At the beginning only a few featur
 
 - `mkdir -p build && cd build && cmake .. && make -j$(nproc)`
 - `./gpu-burn-pro --full` — 5 minute stress test
-- `./gpu-burn-pro --quick` — 10 second stress test\
+- `./gpu-burn-pro --quick` — 10 second stress test (only use for testing not valid for the final result)
 
 ## Tests
 
+Todo but some sort of fault injection test where we inject faults into the matrices and see if the tool can detect them.
+
 ## Todo
+
+- GUI
+- zero dependency installer
+- PCIe bandwidth test (host↔device throughput)
+- Double precision (FP64) and Tensor Core tests
+- ECC error reporting via NVML
+- JSON output for programmatic consumption
+- support for rocm amd
+- Historical comparison (save results, compare across runs) & online leaderboard
+- Multi-GPU support testing
