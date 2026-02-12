@@ -47,6 +47,29 @@ mkdir -p build && cd build && cmake .. && make -j$(nproc)
 
 </details>
 
+## CLI Options
+
+| Flag | Description |
+|---|---|
+| `--full` | Run a 5-minute stress test |
+| `--quick` | Run a 10-second stress test |
+| `--offline` | Skip online result submission |
+| `--json <file>` | Save results to a local JSON file |
+| `-h, --help` | Show help |
+
+**Examples:**
+
+```bash
+# Full test, submit online (default)
+./gpu-stress-test --full
+
+# Quick test, offline only, save results locally
+./gpu-stress-test --quick --offline --json results.json
+
+# Full test, submit online AND save a local copy
+./gpu-stress-test --full --json results.json
+```
+
 ## Tests
 
 Todo but some sort of fault injection test where we inject faults into the matrices and see if the tool can detect them.
@@ -55,15 +78,15 @@ Todo but some sort of fault injection test where we inject faults into the matri
 
 - during the test collect max heat, avg heat, memory of the gpu, country, platform, cuda version, provider, gflops, errors, stress test version, default add result online, in the case user runs offline and online submission fails dont throw error - add optional flag for this ofc - 
 - display benchmark results online - 
-- make result sharable
-- make it possible to run the test from the CLI without the need for having deadass c++ dependencies
+- make result sharable -
+- make it possible to run the test from the CLI without the need for having deadass c++ dependencies - 
 
 - GUI
 - zero dependency installer
 - PCIe bandwidth test (host↔device throughput)
 - Double precision (FP64) and Tensor Core tests
 - ECC error reporting via NVML
-- JSON output for programmatic consumption
+- JSON output for programmatic consumption -
 - support for rocm amd
 - Historical comparison (save results, compare across runs) & online leaderboard
 - Multi-GPU support testing

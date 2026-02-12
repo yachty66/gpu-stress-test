@@ -11,3 +11,6 @@ build/
 *.o
 *.so
 *.a
+
+# Test result files
+*.json

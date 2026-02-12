@@ -19,8 +19,9 @@ void show_help() {
               << "  --full      5 minute stress test\n"
               << "  --quick     10 second stress test\n\n"
               << "Options:\n"
-              << "  --offline   Skip online result submission\n"
-              << "  -h, --help  Show this help\n";
+              << "  --offline        Skip online result submission\n"
+              << "  --json <file>    Save results to a local JSON file\n"
+              << "  -h, --help       Show this help\n";
 }
 
 int main(int argc, char* argv[]) {
@@ -32,6 +33,7 @@ int main(int argc, char* argv[]) {
     StressConfig config;
     bool offline = false;
     bool mode_set = false;
+    std::string json_file;
 
     for (int i = 1; i < argc; ++i) {
         if (strcmp(argv[i], "--full") == 0) {
@@ -42,6 +44,13 @@ int main(int argc, char* argv[]) {
             mode_set = true;
         } else if (strcmp(argv[i], "--offline") == 0) {
             offline = true;
+        } else if (strcmp(argv[i], "--json") == 0) {
+            if (i + 1 < argc) {
+                json_file = argv[++i];
+            } else {
+                std::cerr << "Error: --json requires a filename argument" << std::endl;
+                return 1;
+            }
         } else if (strcmp(argv[i], "-h") == 0 || strcmp(argv[i], "--help") == 0) {
             show_help();
             return 0;
@@ -82,6 +91,13 @@ int main(int argc, char* argv[]) {
                 std::cout << "Results submitted successfully." << std::endl;
             }
             // On failure, submit() already printed a warning — no error thrown
+        }
+
+        if (!json_file.empty()) {
+            bool ok = ResultSubmitter::save_to_file(results, json_file);
+            if (ok) {
+                std::cout << "Results saved to " << json_file << std::endl;
+            }
         }
     } catch (const std::exception& e) {
         std::cerr << "\nFatal error: " << e.what() << std::endl;

@@ -8,6 +8,7 @@
 #include "result_submitter.hpp"
 #include <iostream>
 #include <sstream>
+#include <fstream>
 
 #ifndef NO_CURL
 #include <curl/curl.h>
@@ -137,6 +138,26 @@ bool submit(const std::vector<TestResult>& results) {
 
     return true;
 #endif
+}
+
+bool save_to_file(const std::vector<TestResult>& results, const std::string& filename) {
+    std::string json = to_json(results);
+
+    std::ofstream file(filename);
+    if (!file.is_open()) {
+        std::cerr << "Warning: Could not open file for writing: " << filename << std::endl;
+        return false;
+    }
+
+    file << json;
+    file.close();
+
+    if (file.fail()) {
+        std::cerr << "Warning: Failed to write results to " << filename << std::endl;
+        return false;
+    }
+
+    return true;
 }
 
 } // namespace ResultSubmitter
