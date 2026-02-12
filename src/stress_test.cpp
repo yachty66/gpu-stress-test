@@ -99,11 +99,6 @@ void StressTest::start(const StressConfig& cfg) {
 
     stop();
 
-    // Update memory usage after test (captures peak allocation)
-    for (const auto& s : stats) {
-        s->memory_used_mb = backend->get_memory_used(s->device_id) / (1024 * 1024);
-    }
-
     std::cout << std::endl;
     print_summary();
 }
