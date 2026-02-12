@@ -3,6 +3,8 @@
  */
 
 #include "stress_test.hpp"
+#include "version.hpp"
+#include "system_info.hpp"
 #include <iostream>
 #include <chrono>
 #include <iomanip>
@@ -66,6 +68,10 @@ void StressTest::start(const StressConfig& cfg) {
     std::cout << "\nInitializing devices..." << std::endl;
     for (const auto& s : stats) {
         backend->initialize_device(s->device_id, config);
+
+        // Capture memory info at init time
+        s->memory_total_mb = backend->get_memory_total(s->device_id) / (1024 * 1024);
+        s->memory_used_mb = backend->get_memory_used(s->device_id) / (1024 * 1024);
     }
 
     // Start worker threads
@@ -92,6 +98,12 @@ void StressTest::start(const StressConfig& cfg) {
     }
 
     stop();
+
+    // Update memory usage after test (captures peak allocation)
+    for (const auto& s : stats) {
+        s->memory_used_mb = backend->get_memory_used(s->device_id) / (1024 * 1024);
+    }
+
     std::cout << std::endl;
     print_summary();
 }
@@ -102,10 +114,13 @@ void StressTest::print_progress(int elapsed, int duration) {
     std::cout << "\r" << std::fixed << std::setprecision(1) << pct << "%  ";
 
     for (const auto& s : stats) {
-        // Update temperature
+        // Update temperature and accumulate for average
         int temp = backend->get_temperature(s->device_id);
         if (temp >= 0) {
             s->temperature = temp;
+            s->temp_sum += temp;
+            s->temp_samples++;
+
             int current_max = s->max_temperature.load();
             while (temp > current_max) {
                 s->max_temperature.compare_exchange_weak(current_max, temp);
@@ -151,6 +166,12 @@ void StressTest::print_summary() {
             gflops = s->gflops;
         }
 
+        int avg_temp = -1;
+        int samples = s->temp_samples.load();
+        if (samples > 0) {
+            avg_temp = static_cast<int>(s->temp_sum.load() / samples);
+        }
+
         std::cout << "  GPU " << s->device_id << " (" << s->name << "): "
                   << (is_faulty ? "FAULTY" : "OK");
 
@@ -165,6 +186,11 @@ void StressTest::print_summary() {
             std::cout << " - max " << s->max_temperature.load() << "C";
         }
 
+        if (avg_temp >= 0) {
+            std::cout << " - avg " << avg_temp << "C";
+        }
+
+        std::cout << " - " << s->memory_total_mb << " MB total";
         std::cout << " - " << s->total_ops.load() << " ops";
         std::cout << std::endl;
     }
@@ -176,6 +202,46 @@ void StressTest::print_summary() {
         std::cout << "RESULT: PASS — All GPUs healthy." << std::endl;
     }
     std::cout << "========================================" << std::endl;
+}
+
+std::vector<TestResult> StressTest::collect_results() {
+    std::string cuda_ver = backend->get_cuda_version();
+    std::string platform = SystemInfo::get_platform();
+    std::string provider = SystemInfo::get_provider();
+    std::string country  = SystemInfo::get_country();
+
+    std::vector<TestResult> results;
+    results.reserve(stats.size());
+
+    for (const auto& s : stats) {
+        TestResult r;
+        r.gpu_name          = s->name;
+        r.max_temp_c        = s->max_temperature.load();
+        r.errors            = s->total_errors.load();
+        r.passed            = (r.errors == 0);
+        r.gpu_memory_total_mb = s->memory_total_mb;
+        r.gpu_memory_used_mb  = s->memory_used_mb;
+
+        {
+            std::lock_guard<std::mutex> lock(s->gflops_mutex);
+            r.gflops = s->gflops;
+        }
+
+        int samples = s->temp_samples.load();
+        if (samples > 0) {
+            r.avg_temp_c = static_cast<int>(s->temp_sum.load() / samples);
+        }
+
+        r.cuda_version = cuda_ver;
+        r.country      = country;
+        r.platform     = platform;
+        r.provider     = provider;
+        r.version      = STRESS_TEST_VERSION;
+
+        results.push_back(std::move(r));
+    }
+
+    return results;
 }
 
 void StressTest::stop() {

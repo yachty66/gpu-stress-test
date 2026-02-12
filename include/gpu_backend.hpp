@@ -51,6 +51,15 @@ public:
     // Get current GPU temperature in Celsius (-1 if unavailable)
     virtual int get_temperature(int device_id) = 0;
 
+    // Get CUDA runtime version as string (e.g. "12.4")
+    virtual std::string get_cuda_version() = 0;
+
+    // Get total GPU memory in bytes
+    virtual size_t get_memory_total(int device_id) = 0;
+
+    // Get used GPU memory in bytes (total - free)
+    virtual size_t get_memory_used(int device_id) = 0;
+
     virtual void cleanup(int device_id) = 0;
 };
 

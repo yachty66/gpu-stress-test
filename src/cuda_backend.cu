@@ -340,6 +340,28 @@ public:
         return static_cast<int>(temp);
     }
 
+    std::string get_cuda_version() override {
+        int version = 0;
+        cudaRuntimeGetVersion(&version);
+        int major = version / 1000;
+        int minor = (version % 1000) / 10;
+        return std::to_string(major) + "." + std::to_string(minor);
+    }
+
+    size_t get_memory_total(int device_id) override {
+        CUDA_CHECK(cudaSetDevice(device_id));
+        size_t free_mem, total_mem;
+        CUDA_CHECK(cudaMemGetInfo(&free_mem, &total_mem));
+        return total_mem;
+    }
+
+    size_t get_memory_used(int device_id) override {
+        CUDA_CHECK(cudaSetDevice(device_id));
+        size_t free_mem, total_mem;
+        CUDA_CHECK(cudaMemGetInfo(&free_mem, &total_mem));
+        return total_mem - free_mem;
+    }
+
     void cleanup(int device_id) override {
         CUDA_CHECK(cudaSetDevice(device_id));
         auto& res = resources[device_id];

@@ -5,6 +5,7 @@
 #pragma once
 
 #include "gpu_backend.hpp"
+#include "test_result.hpp"
 #include <atomic>
 #include <vector>
 #include <thread>
@@ -19,6 +20,9 @@ public:
     void start(const StressConfig& config);
     void stop();
     bool is_running() const { return running; }
+
+    // Collect final results after test completes
+    std::vector<TestResult> collect_results();
 
     // Called from signal handlers
     static void request_stop();
@@ -40,6 +44,10 @@ private:
         std::atomic<long long> total_errors{0};
         std::atomic<int> temperature{0};
         std::atomic<int> max_temperature{0};
+        std::atomic<long long> temp_sum{0};
+        std::atomic<int> temp_samples{0};
+        size_t memory_total_mb{0};
+        size_t memory_used_mb{0};
         double gflops{0.0};
         std::mutex gflops_mutex;
         bool faulty{false};

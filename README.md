@@ -32,10 +32,10 @@ Todo but some sort of fault injection test where we inject faults into the matri
 
 ## Todo
 
-- make it possible to run the test from the CLI without the need for having deadass c++ dependencies
 - during the test collect max heat, avg heat, memory of the gpu, country, platform, cuda version, provider, gflops, errors, stress test version, default add result online, in the case user runs offline and online submission fails dont throw error - add optional flag for this ofc
 - display benchmark results online 
 - make result sharable
+- make it possible to run the test from the CLI without the need for having deadass c++ dependencies
 
 - GUI
 - zero dependency installer
