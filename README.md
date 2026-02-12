@@ -22,9 +22,30 @@ The goal is to build a SOTA stress test tool. At the beginning only a few featur
 
 ## How to run
 
-- `mkdir -p build && cd build && cmake .. && make -j$(nproc)`
-- `./gpu-stress-test --full` — 5 minute stress test
-- `./gpu-stress-test --quick` — 10 second stress test (only use for testing not valid for the final result)
+**One-liner (recommended)** — installs dependencies, builds, and runs automatically:
+
+```bash
+curl -sSL https://raw.githubusercontent.com/yachty66/gpu-stress-test/main/run.sh | bash
+```
+
+For a quick 10-second test instead of the full 5-minute test:
+
+```bash
+curl -sSL https://raw.githubusercontent.com/yachty66/gpu-stress-test/main/run.sh | bash -s -- --quick
+```
+
+**Prerequisites:** NVIDIA drivers and CUDA toolkit must be installed. Everything else is handled automatically.
+
+<details>
+<summary>Manual build (if you prefer)</summary>
+
+```bash
+mkdir -p build && cd build && cmake .. && make -j$(nproc)
+./gpu-stress-test --full    # 5 minute stress test
+./gpu-stress-test --quick   # 10 second stress test
+```
+
+</details>
 
 ## Tests
 
@@ -32,8 +53,8 @@ Todo but some sort of fault injection test where we inject faults into the matri
 
 ## Todo
 
-- during the test collect max heat, avg heat, memory of the gpu, country, platform, cuda version, provider, gflops, errors, stress test version, default add result online, in the case user runs offline and online submission fails dont throw error - add optional flag for this ofc
-- display benchmark results online 
+- during the test collect max heat, avg heat, memory of the gpu, country, platform, cuda version, provider, gflops, errors, stress test version, default add result online, in the case user runs offline and online submission fails dont throw error - add optional flag for this ofc - 
+- display benchmark results online - 
 - make result sharable
 - make it possible to run the test from the CLI without the need for having deadass c++ dependencies
 
