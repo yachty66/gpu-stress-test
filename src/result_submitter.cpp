@@ -1,7 +1,7 @@
 /*
  * GPU Stress Test - Result Submitter
  *
- * Serializes test results to JSON and POSTs to an endpoint.
+ * Serializes test results to JSON and POSTs to Supabase.
  * Uses libcurl when available, otherwise stubs out with a warning.
  */
 
@@ -13,8 +13,15 @@
 #include <curl/curl.h>
 #endif
 
-// Dummy endpoint — will be replaced with Supabase URL later
-static const char* SUBMIT_ENDPOINT = "https://httpbin.org/post";
+// Supabase REST API endpoint for the gpu_stress_test_results table
+static const char* SUPABASE_URL =
+    "https://dasomvwqrumtgwktapfa.supabase.co/rest/v1/gpu_stress_test_results";
+
+// Supabase anon key — safe to embed; security is enforced by Row Level Security (RLS)
+static const char* SUPABASE_ANON_KEY =
+    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9."
+    "eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRhc29tdndxcnVtdGd3a3RhcGZhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzA5MDc4NTQsImV4cCI6MjA4NjQ4Mzg1NH0."
+    "FWMcEQdWRWYNxbLqfPhZev64AFAOACbRD7Ll3w52BEI";
 
 namespace {
 
@@ -48,7 +55,9 @@ namespace ResultSubmitter {
 
 std::string to_json(const std::vector<TestResult>& results) {
     std::ostringstream ss;
-    ss << "{\"results\":[";
+
+    // Supabase REST API accepts a JSON array of row objects for bulk insert
+    ss << "[";
 
     for (size_t i = 0; i < results.size(); ++i) {
         const auto& r = results[i];
@@ -72,7 +81,7 @@ std::string to_json(const std::vector<TestResult>& results) {
            << "}";
     }
 
-    ss << "]}";
+    ss << "]";
     return ss.str();
 }
 
@@ -90,10 +99,17 @@ bool submit(const std::vector<TestResult>& results) {
         return false;
     }
 
+    // Build auth header strings
+    std::string apikey_header = std::string("apikey: ") + SUPABASE_ANON_KEY;
+    std::string auth_header   = std::string("Authorization: Bearer ") + SUPABASE_ANON_KEY;
+
     struct curl_slist* headers = nullptr;
     headers = curl_slist_append(headers, "Content-Type: application/json");
+    headers = curl_slist_append(headers, apikey_header.c_str());
+    headers = curl_slist_append(headers, auth_header.c_str());
+    headers = curl_slist_append(headers, "Prefer: return=minimal");
 
-    curl_easy_setopt(curl, CURLOPT_URL, SUBMIT_ENDPOINT);
+    curl_easy_setopt(curl, CURLOPT_URL, SUPABASE_URL);
     curl_easy_setopt(curl, CURLOPT_POSTFIELDS, json.c_str());
     curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
     curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, discard_callback);
