@@ -46,6 +46,10 @@ private:
         std::atomic<int> max_temperature{0};
         std::atomic<long long> temp_sum{0};
         std::atomic<int> temp_samples{0};
+        std::atomic<int> power_usage{0};        // current power in watts
+        std::atomic<int> max_power{0};           // peak power in watts
+        std::atomic<long long> power_sum{0};     // sum for averaging
+        std::atomic<int> power_samples{0};       // count for averaging
         size_t memory_total_mb{0};
         size_t memory_used_mb{0};
         double gflops{0.0};

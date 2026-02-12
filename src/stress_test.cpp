@@ -127,6 +127,20 @@ void StressTest::print_progress(int elapsed, int duration) {
             }
         }
 
+        // Update power usage and accumulate for average
+        int power_mw = backend->get_power_usage(s->device_id);
+        if (power_mw >= 0) {
+            int power_w = power_mw / 1000;
+            s->power_usage = power_w;
+            s->power_sum += power_w;
+            s->power_samples++;
+
+            int current_max_p = s->max_power.load();
+            while (power_w > current_max_p) {
+                s->max_power.compare_exchange_weak(current_max_p, power_w);
+            }
+        }
+
         double gflops = 0.0;
         {
             std::lock_guard<std::mutex> lock(s->gflops_mutex);
@@ -143,6 +157,10 @@ void StressTest::print_progress(int elapsed, int duration) {
 
         if (temp >= 0) {
             std::cout << " " << temp << "C";
+        }
+
+        if (power_mw >= 0) {
+            std::cout << " " << (power_mw / 1000) << "W";
         }
 
         std::cout << "  ";
@@ -190,6 +208,15 @@ void StressTest::print_summary() {
             std::cout << " - avg " << avg_temp << "C";
         }
 
+        int power_samp = s->power_samples.load();
+        if (s->max_power.load() > 0) {
+            std::cout << " - max " << s->max_power.load() << "W";
+        }
+        if (power_samp > 0) {
+            int avg_power = static_cast<int>(s->power_sum.load() / power_samp);
+            std::cout << " - avg " << avg_power << "W";
+        }
+
         std::cout << " - " << s->memory_total_mb << " MB total";
         std::cout << " - " << s->total_ops.load() << " ops";
         std::cout << std::endl;
@@ -230,6 +257,12 @@ std::vector<TestResult> StressTest::collect_results() {
         int samples = s->temp_samples.load();
         if (samples > 0) {
             r.avg_temp_c = static_cast<int>(s->temp_sum.load() / samples);
+        }
+
+        r.max_power_w = s->max_power.load();
+        int p_samples = s->power_samples.load();
+        if (p_samples > 0) {
+            r.avg_power_w = static_cast<int>(s->power_sum.load() / p_samples);
         }
 
         r.cuda_version = cuda_ver;

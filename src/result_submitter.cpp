@@ -62,6 +62,8 @@ std::string to_json(const std::vector<TestResult>& results) {
            << "\"gflops\":" << r.gflops << ","
            << "\"errors\":" << r.errors << ","
            << "\"passed\":" << (r.passed ? "true" : "false") << ","
+           << "\"max_power_w\":" << r.max_power_w << ","
+           << "\"avg_power_w\":" << r.avg_power_w << ","
            << "\"cuda_version\":\"" << json_escape(r.cuda_version) << "\","
            << "\"country\":\"" << json_escape(r.country) << "\","
            << "\"platform\":\"" << json_escape(r.platform) << "\","

@@ -340,6 +340,18 @@ public:
         return static_cast<int>(temp);
     }
 
+    int get_power_usage(int device_id) override {
+        if (!nvml_initialized || device_id >= static_cast<int>(nvml_devices.size())) {
+            return -1;
+        }
+        unsigned int power_mw = 0;
+        nvmlReturn_t result = nvmlDeviceGetPowerUsage(nvml_devices[device_id], &power_mw);
+        if (result != NVML_SUCCESS) {
+            return -1;
+        }
+        return static_cast<int>(power_mw);
+    }
+
     std::string get_cuda_version() override {
         int version = 0;
         cudaRuntimeGetVersion(&version);

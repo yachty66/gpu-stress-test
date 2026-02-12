@@ -51,6 +51,9 @@ public:
     // Get current GPU temperature in Celsius (-1 if unavailable)
     virtual int get_temperature(int device_id) = 0;
 
+    // Get current GPU power usage in milliwatts (-1 if unavailable)
+    virtual int get_power_usage(int device_id) = 0;
+
     // Get CUDA runtime version as string (e.g. "12.4")
     virtual std::string get_cuda_version() = 0;
 

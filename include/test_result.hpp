@@ -19,6 +19,8 @@ struct TestResult {
     double      gflops           = 0.0;
     long long   errors           = 0;
     bool        passed           = true;
+    int         max_power_w      = -1;
+    int         avg_power_w      = -1;
 
     // System-wide context (same for all GPUs in one run)
     std::string cuda_version;   // e.g. "12.4"
