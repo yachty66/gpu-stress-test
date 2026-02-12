@@ -7,6 +7,8 @@
 
 #include "system_info.hpp"
 #include <cstdlib>
+#include <cctype>
+#include <cstdint>
 
 #ifndef NO_CURL
 #include <curl/curl.h>
@@ -62,6 +64,26 @@ std::string extract_json_string(const std::string& json, const std::string& key)
     return json.substr(pos, end - pos);
 }
 
+// Convert a 2-letter country code (e.g. "US") to a flag emoji (e.g. 🇺🇸)
+// using Unicode Regional Indicator Symbols (U+1F1E6 to U+1F1FF)
+std::string country_code_to_flag(const std::string& code) {
+    if (code.size() != 2) return code;
+
+    std::string flag;
+    for (char c : code) {
+        char upper = static_cast<char>(std::toupper(static_cast<unsigned char>(c)));
+        if (upper < 'A' || upper > 'Z') return code;
+
+        uint32_t cp = 0x1F1E6 + (upper - 'A');
+        // Encode as UTF-8 (4 bytes for code points in U+10000..U+1FFFF)
+        flag += static_cast<char>(0xF0 | ((cp >> 18) & 0x07));
+        flag += static_cast<char>(0x80 | ((cp >> 12) & 0x3F));
+        flag += static_cast<char>(0x80 | ((cp >> 6)  & 0x3F));
+        flag += static_cast<char>(0x80 | (cp & 0x3F));
+    }
+    return flag;
+}
+
 } // anonymous namespace
 
 namespace SystemInfo {
@@ -104,7 +126,7 @@ std::string get_country() {
         std::string response = http_get("http://ip-api.com/json/?fields=countryCode", 3);
         if (!response.empty()) {
             std::string code = extract_json_string(response, "countryCode");
-            if (!code.empty()) return code;
+            if (!code.empty()) return country_code_to_flag(code);
         }
     } catch (...) {
         // Fall through
