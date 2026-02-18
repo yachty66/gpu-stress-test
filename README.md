@@ -19,6 +19,7 @@ The goal is to build a SOTA stress test tool. At the beginning only a few featur
 - **Temperature & Thermal Throttling** — monitors GPU temp throughout the test via NVML
 - **Computational Correctness** — compares every result against a reference to catch silent data corruption
 - **Sustained Load Stability** — runs for minutes to surface issues that only appear under prolonged stress
+![Stress Test CLI Output](assets/example-result.png)
 
 ## How to run
 
@@ -69,6 +70,17 @@ mkdir -p build && cd build && cmake .. && make -j$(nproc)
 # Full test, submit online AND save a local copy
 ./gpu-stress-test --full --json results.json
 ```
+
+## Online Dashboard & Leaderboard
+
+All stress test results are automatically submitted to the online dashboard (unless `--offline` is used).
+
+**View your results here:** [https://www.zusecompute.com/gpu-stress-test](https://www.zusecompute.com/gpu-stress-test)
+
+- **Compare Performance:** See how your GPU stacks up against others globally.
+- **Shareable Reports:** Generate a public link or download a certificate of your result.
+- **Detailed Telemetry:** View max temperatures, error rates, and sustainment metrics.
+![Online Dashboard](assets/leaderboard.png)
 
 ## Tests
 
